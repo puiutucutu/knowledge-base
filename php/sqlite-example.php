@@ -8,7 +8,6 @@ date_default_timezone_set('UTC');
 
 try {
 
-
     // create (connect to) SQLite database in file
     $fileDatabase = new PDO('sqlite:messaging.sqlite3');
     $fileDatabase->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

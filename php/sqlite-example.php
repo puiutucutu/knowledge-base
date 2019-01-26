@@ -11,6 +11,7 @@ try {
     // create (connect to) SQLite database in file
     $fileDatabase = new PDO('sqlite:messaging.sqlite3');
     $fileDatabase->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $fileDatabase->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
     /**
      * Create Tables

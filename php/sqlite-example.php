@@ -108,6 +108,6 @@ SQL;
     $fileDatabase->exec("DROP TABLE messages");
     $fileDatabase = null; // close file db connection
 
-} catch(PDOException $e) {
+} catch (PDOException $e) {
     echo $e->getMessage();
 }

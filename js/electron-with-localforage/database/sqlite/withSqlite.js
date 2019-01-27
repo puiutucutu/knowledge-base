@@ -1,14 +1,18 @@
-const sqlite3 = require("sqlite3").verbose();
-const db = new sqlite3.Database("./database/sqlite/database.sqlite3");
+const sqlite = require("sqlite");
 
-const sql = "SELECT rowid AS id, info FROM lorem";
-
-db.all(sql, function(err, rows) {
-  console.log(
-    "%c using sqlite",
-    "background: red; color: white;" + " font-weight: bold"
-  );
-  console.log(rows);
+const dbPromise = sqlite.open("./database/sqlite/database.sqlite3", {
+  Promise
 });
 
-db.close();
+dbPromise.then(function(dbh) {
+  Promise.all([
+    dbh.get("SELECT rowid AS id, info FROM lorem"),
+    dbh.all("SELECT rowid AS id, info FROM lorem")
+  ]).then(function(results) {
+    console.log(
+      "%c sqlite ::: results are...",
+      "background: red; color: white; font-weight: bold; font-size: 14px;",
+      results
+    );
+  });
+});

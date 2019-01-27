@@ -1,4 +1,4 @@
-const sqlite3 = require("sqlite3");
+const sqlite3 = require("sqlite3").verbose();
 
 class AppDAO {
   constructor(dbFilePath) {
@@ -10,11 +10,23 @@ class AppDAO {
       }
     });
   }
+
+  getItems() {
+    const sql = "SELECT rowid AS id, info FROM lorem";
+    dao.db.all(sql, function(err, rows) {
+      console.log(
+        "%c sqlite3 ::: results are...",
+        "background: red; color: white; font-weight: bold; font-size: 14px;",
+        rows
+      );
+    });
+  }
+
+  close() {
+    this.db.close();
+  }
 }
 
 const dao = new AppDAO("./database/sqlite/database.sqlite3");
-console.log(dao);
-console.dir(sqlite3)
-console.log(dao.db)
-
-module.exports = AppDAO;
+dao.getItems();
+dao.close();

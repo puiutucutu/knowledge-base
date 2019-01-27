@@ -1,20 +1,14 @@
-const sqlite3 = require("sqlite3");
+const sqlite3 = require("sqlite3").verbose();
+const db = new sqlite3.Database("./database/sqlite/database.sqlite3");
 
-class AppDAO {
-  constructor(dbFilePath) {
-    this.db = new sqlite3.Database(dbFilePath, err => {
-      if (err) {
-        console.log("Could not connect to database", err);
-      } else {
-        console.log("Connected to database");
-      }
-    });
-  }
-}
+const sql = "SELECT rowid AS id, info FROM lorem";
 
-const dao = new AppDAO("./database/sqlite/database.sqlite3");
-console.log(dao);
-console.dir(sqlite3)
-console.log(dao.db)
+db.all(sql, function(err, rows) {
+  console.log(
+    "%c using sqlite",
+    "background: red; color: white;" + " font-weight: bold"
+  );
+  console.log(rows);
+});
 
-module.exports = AppDAO;
+db.close();

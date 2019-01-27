@@ -25,6 +25,7 @@
     "localforage": "^1.7.3"
   },
   "dependencies": {
+    "sqlite": "^3.0.0",
     "sqlite3": "^4.0.6"
   }
 }

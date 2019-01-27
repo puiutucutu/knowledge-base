@@ -14,7 +14,8 @@
     <script>
       // You can also require other files to run in this process
       require('./renderer.js')
-      require('./localStorage')
+      require('./database/localForage/withLocalForage.js')
+      require('./database/sqlite/withSqlite.js')
     </script>
   </body>
 </html>

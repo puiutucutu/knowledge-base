@@ -4,7 +4,10 @@
   "description": "A minimal Electron application",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
   },
   "repository": "https://github.com/electron/electron-quick-start",
   "keywords": [
@@ -18,6 +21,10 @@
   "license": "CC0-1.0",
   "devDependencies": {
     "electron": "^4.0.2",
+    "electron-builder": "^20.38.5",
     "localforage": "^1.7.3"
+  },
+  "dependencies": {
+    "sqlite3": "^4.0.6"
   }
 }

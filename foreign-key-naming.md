@@ -18,7 +18,7 @@ Use double underscores between.
 
 ## Current Preference
 
-MSSQL allows using unicode symbol → (ALT+26).
+MSSQL allows using ascii sym → (ALT+26).
 
 `FK_{ingredient→recipe}{recipeId→id}`
 

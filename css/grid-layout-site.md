@@ -90,7 +90,7 @@ body {
 
 ## HTML
 
-``html
+``txt
 <div class="container">
   <div class="item header">header</div>
   <div class="item sidebar">sidebar</div>

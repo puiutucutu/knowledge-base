@@ -202,3 +202,55 @@ volumes:
 
 - **Destructive Reset (`docker compose down -v`):** Deletes the volume and forces a 30–45s cold boot to re-create system databases and restore volume metadata.
 - **In-Place Reset (~2 seconds):** Drops and recreates the target user databases or wipes mutable tables in foreign-key dependency order, followed by re-seeding against the warm, running engine.
+
+## 8. Architectural Decision Matrix & Environmental Tradeoffs
+
+Different applications and team workflows justify different architectural choices. The following decision matrix details the four core dimensions of containerized Microsoft SQL Server environments, the conditions each approach is optimized for, and the operational triggers that warrant moving between them.
+
+### Dimension 1: Container Topology (Single-Engine Multi-DB vs. Dual Dedicated Stacks)
+
+| Approach | Architecture | Optimized For | Trade-offs & Limitations |
+| :--- | :--- | :--- | :--- |
+| **Approach 1A: Single-Engine, Multi-DB** *(authz-admin standard)* | One SQL Server container hosting `[App]`, `[App_test]`, and `[MockReplica]` on port `1433` | • Local development workstations with standard RAM allocations (consumes only ~1.5–2.0 GB total).<br>• Zero cold-boot latency when running test suites against an already-warm instance.<br>• Monorepos where test runners execute inside container networks.<br>• Clean framework-level database catalog routing (e.g. `APP_ENV=test`). | • Unsuitable if automated test suites execute destructive volume tear-downs (`down -v`).<br>• Potential lock contention if a developer actively clicks through the UI while running heavy batch tests simultaneously. |
+| **Approach 1B: Dual Dedicated Stacks** *(Warrants pattern)* | Dev stack on port `1433` (`warrants-mssql`) + separate test daemon on port `14333` (`warrants-test-mssql`) | • Complete physical firewall isolation between developer UI data and automated test suites.<br>• Environments where test scripts execute raw DML table truncations.<br>• Host-native test runners connecting over distinct TCP ports.<br>• Multi-developer shared remote Docker environments. | • Heavy memory footprint (**~3.5 GB to 5.0 GB+ RAM** running two independent SQL Server engines).<br>• Port management overhead and potential collisions on port 14333.<br>• Cold-boot delay if the test daemon is not running. |
+
+#### Migration Triggers:
+
+- **Move from 1A to 1B when:** Test suites execute destructive schema wipes or high-concurrency batch syncs that lock tables or destroy manual UI session state needed for active exploratory testing.
+- **Move from 1B to 1A when:** Developer machines experience RAM starvation, or test execution moves into containers where framework routing cleanly handles database isolation.
+
+### Dimension 2: Test Execution Seam (Container-Bound vs. Host-Native)
+
+| Approach | Architecture | Optimized For | Trade-offs & Limitations |
+| :--- | :--- | :--- | :--- |
+| **Approach 2A: Container-Bound Harness** *(authz-admin standard & Warrants Delivery 96)* | Tests execute inside the Linux API container via `docker compose exec` | • **Zero developer host prerequisites:** Developers do not need native Microsoft ODBC Driver 18 (`msodbcsql18`), `unixodbc`, or PHP extensions installed on macOS or Windows.<br>• 100% runtime parity with production Linux containers. | • Minor invocation overhead (~200ms) to launch `docker exec` processes compared to native host binaries. |
+| **Approach 2B: Host-Native Execution** *(Warrants Delivery 62 legacy)* | Tests execute natively on host OS against published Docker loopback ports (`127.0.0.1:14333`) | • Direct IDE integration (running individual tests via native "Play" buttons in VS Code, PHPStorm, or GoLand).<br>• Sub-millisecond process invocation speed. | • High developer friction: requires installing, configuring, and troubleshooting OS-specific ODBC drivers and extensions natively across macOS, Windows, and Linux. |
+
+#### Migration Triggers:
+
+- **Move from 2B to 2A when:** Onboarding new team members or AI agents across differing host operating systems where native ODBC driver installation creates recurring setup friction.
+- **Move from 2A to 2B when:** Sub-second IDE test runners or profiling tools require direct in-process debugging from the host operating system.
+
+### Dimension 3: Test State Reset Mechanism (Dynamic ORM vs. In-Place DML vs. Transactional)
+
+| Approach | Reset Strategy | Optimized For | Trade-offs & Limitations |
+| :--- | :--- | :--- | :--- |
+| **Approach 3A: Dynamic ORM Schema Tool** *(authz-admin standard)* | Doctrine ORM / DBAL dynamically drops and rebuilds tables in `[Authorization_test]` from PHP entity attributes | • Projects driven by an ORM (Doctrine, Entity Framework, Prisma, Hibernate).<br>• Zero manual SQL reset scripts to maintain when entity properties change. | • Slower resets than raw DML (~3–5s vs ~2s) because it executes DDL table drops and creates. |
+| **Approach 3B: In-Place Raw DML Wipe & Reseed** *(Warrants pattern)* | Executes raw T-SQL scripts (`DELETE FROM ...` in FK dependency order + reseed) | • High-performance test suites requiring ~2-second full database resets.<br>• Systems leveraging raw T-SQL features (views, triggers, `OPENJSON`, procs) that ORMs cannot model. | • High maintenance: every schema change requires updating both DDL and wipe scripts in strict dependency order. |
+| **Approach 3C: Transactional Rollback** | Each test executes inside an outer database transaction (`BEGIN TRAN` ... `ROLLBACK`) | • Fast unit and controller integration tests requiring sub-millisecond resets (~5ms per test). | • Cannot test code that commits internal nested transactions, tests background workers, or executes multi-connection lock evaluation. |
+
+#### Migration Triggers:
+
+- **Move from 3A to 3B when:** Test suites grow large enough that DDL schema recreation overhead becomes a bottleneck, or when raw database triggers and procedures are introduced.
+- **Move from 3B/3A to 3C when:** Running hundreds of read-heavy unit tests where transaction rollback provides instant test iteration.
+
+### Dimension 4: Startup Coordination (Compose Dependencies vs. In-App Retries)
+
+| Approach | Coordination Strategy | Optimized For | Trade-offs & Limitations |
+| :--- | :--- | :--- | :--- |
+| **Approach 4A: Compose Dependency Gate** *(Platform Standard)* | `api` declares `depends_on: { db-initializer: { condition: service_completed_successfully } }` | • Local Docker Compose development and CI runners.<br>• Guarantees application containers never boot until database recovery is complete and schemas are seeded. | • Exclusive to Docker Compose; does not translate directly to raw cloud deployments (Kubernetes, AWS ECS). |
+| **Approach 4B: In-App Readiness Polling** | Application entrypoint loops on `SELECT 1` with exponential backoff on container boot | • Distributed cloud deployments (Kubernetes pods, AWS ECS tasks, Azure App Service) where container engines do not share Compose healthcheck primitives. | • Application logs get cluttered with transient connection error traces during boot. |
+
+#### Migration Triggers:
+
+- **Move from 4A to 4B when:** Packaging application containers for production deployment targets (Kubernetes, ECS, IIS) where external container orchestrators manage container boot lifecycles independently.
